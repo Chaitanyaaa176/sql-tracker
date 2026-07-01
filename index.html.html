@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Progress Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  [data-theme="light"] {
+    --bg:            #f4f0e8;
+    --surface:       #fffefb;
+    --surface2:      #f0ece4;
+    --border:        #e5e0d8;
+    --border-strong: #cdc7bc;
+    --text-primary:  #1c1917;
+    --text-secondary:#6b6560;
+    --text-muted:    #a09890;
+    --accent:        #cc785c;
+    --accent-light:  #f7ede7;
+    --accent-text:   #7c2d12;
+    --green:         #5a8a6a;
+    --green-bg:      #eaf1eb;
+    --green-text:    #2d5a3a;
+    --amber-bg:      #fdf3e0;
+    --amber-text:    #7c5a1e;
+    --hover:         #ede8df;
+    --shadow:        rgba(0,0,0,0.06);
+    --pill-bg:       #5a2a18;
+  }
+
+  [data-theme="dark"] {
+    --bg:            #161412;
+    --surface:       #1f1c18;
+    --surface2:      #2a2520;
+    --border:        #333028;
+    --border-strong: #4a4438;
+    --text-primary:  #f0ebe2;
+    --text-secondary:#a09880;
+    --text-muted:    #6b6358;
+    --accent:        #d4845e;
+    --accent-light:  #3a2218;
+    --accent-text:   #f0a882;
+    --green:         #6a9e7a;
+    --green-bg:      #1a2e20;
+    --green-text:    #8ecfa0;
+    --amber-bg:      #2e2510;
+    --amber-text:    #d4a85a;
+    --hover:         #2a2520;
+    --shadow:        rgba(0,0,0,0.4);
+    --pill-bg:       #4a2010;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 1.75rem 1.25rem 2.5rem;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  /* ── TOP BAR ── */
+  .top-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+  .title-block { flex: 1; min-width: 0; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 3px; }
+  .subtitle { font-size: 13px; color: var(--text-secondary); }
+  .subtitle a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .subtitle a:hover { text-decoration: underline; }
+  .start-date { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .theme-btn {
+    background: var(--surface2); border: 0.5px solid var(--border-strong);
+    border-radius: 20px; padding: 6px 14px;
+    font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    cursor: pointer; display: flex; align-items: center; gap: 5px;
+    transition: background 0.15s, color 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .theme-btn:hover { background: var(--hover); color: var(--text-primary); }
+
+  /* ── CONFETTI CANVAS ── */
+  #confetti-canvas {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 9999;
+    width: 100%; height: 100%;
+  }
+
+  /* ── ESTIMATED COMPLETION ── */
+  .est-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 12px 16px;
+    margin-bottom: 12px; box-shadow: 0 1px 4px var(--shadow);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .est-icon { font-size: 20px; flex-shrink: 0; }
+  .est-body { flex: 1; min-width: 0; }
+  .est-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .est-value { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .est-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* ── STATS ── */
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 12px;
+  }
+  .stat {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 14px; text-align: center;
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+  .stat-val { font-size: 24px; font-weight: 700; line-height: 1; color: var(--text-primary); }
+  .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 5px; font-weight: 500; }
+
+  /* ── OVERALL PROGRESS TOGGLE ── */
+  .overall-toggle {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 12px; box-shadow: 0 1px 4px var(--shadow);
+    cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 14px;
+    transition: background 0.1s;
+  }
+  .overall-toggle:hover { background: var(--hover); }
+  .overall-toggle-label {
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .overall-bar-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .overall-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
+  .overall-pct { font-size: 13px; font-weight: 700; color: var(--accent); min-width: 38px; text-align: right; }
+  .overall-chevron { color: var(--text-muted); font-size: 14px; transition: transform 0.2s; }
+  .overall-chevron.open { transform: rotate(180deg); }
+
+  /* ── CALENDAR (collapsible) ── */
+  .cal-wrap {
+    margin-bottom: 14px;
+    display: none;
+    justify-content: center;
+  }
+  .cal-wrap.open { display: flex; }
+
+  .cal-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 16px; padding: 16px;
+    box-shadow: 0 2px 8px var(--shadow);
+    display: inline-block;
+  }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+  .cal-month-lbl { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .cal-navs { display: flex; gap: 2px; }
+  .cal-nav-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; color: var(--text-muted);
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; transition: background 0.1s;
+  }
+  .cal-nav-btn:hover { background: var(--hover); color: var(--text-primary); }
+
+  /*
+    KEY ALIGNMENT FIX:
+    Calendar uses CSS grid with gap: 3px. Each row = 22px header OR 36px day.
+    Streak pill MUST use the same grid structure — same row heights, same gaps, NO extra padding.
+    Padding inside the pill is on left/right ONLY, never top/bottom.
+  */
+  .grid-row {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 38px);
+    gap: 6px;
+  }
+  .cal-dh {
+    width: 38px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+  }
+  .cal-cell {
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; cursor: pointer; transition: background 0.1s;
+    position: relative; color: var(--text-muted);
+  }
+  .cal-cell.empty, .cal-cell.future { color: var(--border-strong); cursor: default; }
+  .cal-cell.missed:hover { background: var(--hover); border-radius: 50%; }
+  .cal-cell.studied::before {
+    content: ''; position: absolute;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent); z-index: 0;
+  }
+  .cal-cell.studied { color: white; font-weight: 600; }
+  .cal-cell.today::after {
+    content: ''; position: absolute;
+    width: 34px; height: 34px;
+    border: 1.5px solid var(--accent); border-radius: 50%;
+    z-index: 0;
+  }
+  .cal-cell.today { color: var(--accent); font-weight: 700; }
+  .cal-cell.today.studied::after { display: none; }
+  .cal-cell.today.studied { color: white; }
+  .cal-cell span { position: relative; z-index: 1; }
+
+  /*
+    Streak pill — row heights are set dynamically via JS (inline style) to be
+    byte-for-byte identical to the calendar's grid-template-rows. This avoids
+    any browser rounding differences between two separately-computed grids.
+  */
+  .streak-pill {
+    background: var(--pill-bg);
+    border-radius: 20px;
+    width: 42px;
+    display: grid;
+    gap: 6px;
+    padding: 0;
+    align-items: center;
+    justify-items: center;
+    overflow: hidden;
+  }
+  .pill-spacer { /* empty cell opposite the day-header */ }
+  .pill-week { display: flex; align-items: center; justify-content: center; position: relative; }
+
+  .s-dot {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 600;
+  }
+  .s-dot.active { background: #e8794d; color: white; }
+
+  /* Current-week badge: rounded emoji-style flame, dark circle for contrast against the coral pill */
+  .s-current {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #241005;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .s-current svg { position: absolute; width: 30px; height: 30px; }
+  .s-current .cur-num {
+    position: relative; z-index: 2;
+    color: white; font-size: 11px; font-weight: 700;
+    margin-top: 6px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  }
+
+
+  /* ── MODULES ── */
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.7px;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .module {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 12px; margin-bottom: 7px; overflow: hidden;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .module-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 16px; cursor: pointer; user-select: none; gap: 12px;
+    transition: background 0.1s;
+  }
+  .module-header:hover { background: var(--hover); }
+  .module-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .module-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--surface2); border: 0.5px solid var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0;
+  }
+  .module-num.done-num { background: var(--green-bg); border-color: var(--green); color: var(--green-text); }
+  .module-title { font-size: 14px; font-weight: 500; }
+  .module-meta  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .module-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .pill { font-size: 10px; padding: 3px 9px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+  .pill-done     { background: var(--green-bg);  color: var(--green-text); }
+  .pill-progress { background: var(--amber-bg);  color: var(--amber-text); }
+  .pill-todo     { background: var(--surface2); color: var(--text-muted); border: 0.5px solid var(--border); }
+  .mod-bar-wrap { width: 52px; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .mod-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+  .chevron { color: var(--text-muted); font-size: 15px; transition: transform 0.2s; flex-shrink: 0; }
+  .chevron.open { transform: rotate(180deg); }
+  .lessons { border-top: 0.5px solid var(--border); display: none; }
+  .lessons.open { display: block; }
+  .lesson {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 16px; border-bottom: 0.5px solid var(--border);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .lesson:last-child { border-bottom: none; }
+  .lesson:hover { background: var(--hover); }
+  .check {
+    width: 17px; height: 17px; border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s; background: var(--surface2);
+  }
+  .check.done { background: var(--green); border-color: var(--green); }
+  .check.done::after {
+    content: ''; display: block; width: 4px; height: 8px;
+    border: 2px solid white; border-top: none; border-left: none;
+    transform: rotate(45deg) translate(-1px,-1px);
+  }
+  .lesson-name { font-size: 13px; flex: 1; }
+  .lesson-name.done { color: var(--text-muted); text-decoration: line-through; }
+  .lesson-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="title-block">
+      <h1>SQL Progress</h1>
+      <p class="subtitle">
+        <a href="https://www.stratascratch.com/learn/comprehensive-sql" target="_blank">StrataScratch</a>
+        · Comprehensive SQL · 36 lessons
+      </p>
+      <p class="start-date" id="start-date-label"></p>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
+  </div>
+
+  <!-- CONFETTI CANVAS -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- ESTIMATED COMPLETION -->
+  <div class="est-card">
+    <div class="est-icon">🎯</div>
+    <div class="est-body">
+      <div class="est-label">Estimated completion</div>
+      <div class="est-value" id="est-date">—</div>
+      <div class="est-sub" id="est-sub">Complete more lessons to get a projection</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="s-done">0</div><div class="stat-label">done</div></div>
+    <div class="stat"><div class="stat-val" id="s-left">36</div><div class="stat-label">left</div></div>
+    <div class="stat"><div class="stat-val" id="s-pct">0%</div><div class="stat-label">complete</div></div>
+  </div>
+
+  <!-- OVERALL PROGRESS TOGGLE -->
+  <div class="overall-toggle" onclick="toggleCalendar()">
+    <span class="overall-toggle-label">Overall progress</span>
+    <div class="overall-bar-track"><div class="overall-bar-fill" id="overall-bar" style="width:0%"></div></div>
+    <span class="overall-pct" id="overall-pct">0%</span>
+    <span class="overall-chevron" id="overall-chevron">▾</span>
+  </div>
+
+  <!-- CALENDAR (collapsible, centered) -->
+  <div class="cal-wrap" id="cal-wrap">
+    <div class="cal-card">
+      <div class="cal-head">
+        <span class="cal-month-lbl" id="cal-label"></span>
+        <div class="cal-navs">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="grid-row">
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="streak-pill" id="streak-pill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULES -->
+  <div class="section-label">Modules</div>
+  <div id="modules"></div>
+
+</div>
+
+<script>
+const MODULES = [
+  { title: "SQL foundations", meta: "8 lessons · 4 hr 30 min", lessons: [
+    { name: "Introduction to databases & SQL", time: "20 min" },
+    { name: "SELECT and FROM basics", time: "35 min" },
+    { name: "Filtering with WHERE", time: "45 min" },
+    { name: "Logical operators: AND, OR, NOT", time: "45 min" },
+    { name: "Pattern matching: LIKE, IN, BETWEEN", time: "50 min" },
+    { name: "Working with NULL", time: "30 min" },
+    { name: "Sorting with ORDER BY", time: "20 min" },
+    { name: "Limiting results with LIMIT", time: "25 min" },
+  ]},
+  { title: "Aggregating & grouping data", meta: "6 lessons · 3 hr 25 min", lessons: [
+    { name: "Introduction to aggregate functions", time: "35 min" },
+    { name: "GROUP BY fundamentals", time: "40 min" },
+    { name: "Filtering groups with HAVING", time: "25 min" },
+    { name: "NULL handling in aggregations", time: "25 min" },
+    { name: "Conditional aggregation with CASE WHEN", time: "45 min" },
+    { name: "Combining aggregation techniques", time: "35 min" },
+  ]},
+  { title: "Working with multiple tables", meta: "8 lessons · 4 hr 5 min", lessons: [
+    { name: "Understanding table relationships", time: "15 min" },
+    { name: "Combining results with UNION", time: "40 min" },
+    { name: "INNER JOIN fundamentals", time: "35 min" },
+    { name: "LEFT and RIGHT OUTER JOINs", time: "35 min" },
+    { name: "FULL OUTER JOIN", time: "25 min" },
+    { name: "CROSS JOIN", time: "30 min" },
+    { name: "Self-joins", time: "30 min" },
+    { name: "Joining multiple tables", time: "35 min" },
+  ]},
+  { title: "Subqueries & CTEs", meta: "4 lessons · 2 hr 20 min", lessons: [
+    { name: "Understanding subqueries", time: "35 min" },
+    { name: "CTE fundamentals", time: "40 min" },
+    { name: "Building with multiple CTEs", time: "25 min" },
+    { name: "CTE patterns for common problems", time: "40 min" },
+  ]},
+  { title: "Date, time & text functions", meta: "5 lessons · 3 hr 20 min", lessons: [
+    { name: "Date/time data types and extraction", time: "45 min" },
+    { name: "Date arithmetic and truncation", time: "30 min" },
+    { name: "String functions", time: "35 min" },
+    { name: "Pattern matching and string splitting", time: "45 min" },
+    { name: "Combining functions", time: "45 min" },
+  ]},
+  { title: "Window functions", meta: "5 lessons · 2 hr 55 min", lessons: [
+    { name: "Introduction to window functions", time: "30 min" },
+    { name: "PARTITION BY and ranking functions", time: "40 min" },
+    { name: "LAG and LEAD", time: "35 min" },
+    { name: "Aggregate window functions", time: "25 min" },
+    { name: "Window frames and advanced patterns", time: "45 min" },
+  ]},
+];
+
+const TOTAL = MODULES.reduce((a,m)=>a+m.lessons.length,0);
+const DAY_LABELS  = ['S','M','T','W','T','F','S'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const START_DATE  = '2026-06-28';
+
+let state = loadState();
+let openModules = [true,false,false,false,false,false];
+let calOpen = false;
+let calViewYear, calViewMonth;
+
+function loadState()     { try{return JSON.parse(localStorage.getItem('sql_tracker')||'{}')}catch{return{}} }
+function saveState(s)    { localStorage.setItem('sql_tracker',JSON.stringify(s)) }
+function loadActivity()  { try{return JSON.parse(localStorage.getItem('sql_activity')||'[]')}catch{return[]} }
+function saveActivity(a) { localStorage.setItem('sql_activity',JSON.stringify(a)) }
+function loadTheme()     { return localStorage.getItem('sql_theme')||'dark' }
+function saveTheme(t)    { localStorage.setItem('sql_theme',t) }
+
+function todayStr() { return new Date().toISOString().slice(0,10) }
+function formatDate(ds) { return new Date(ds).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); }
+
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('theme-btn').textContent = t==='dark'?'☀️ Light':'🌙 Dark';
+}
+function toggleTheme() {
+  const cur=document.documentElement.getAttribute('data-theme')||'dark';
+  const next=cur==='dark'?'light':'dark';
+  applyTheme(next); saveTheme(next);
+}
+
+function toggleCalendar() {
+  calOpen = !calOpen;
+  document.getElementById('cal-wrap').classList.toggle('open', calOpen);
+  document.getElementById('overall-chevron').classList.toggle('open', calOpen);
+  if (calOpen) renderCalendar();
+}
+
+function markTodayActive() {
+  const today=todayStr(); const act=loadActivity();
+  if(!act.includes(today)){act.push(today);saveActivity(act);}
+}
+
+function renderSummary() {
+  const doneCount = Object.values(state).filter(Boolean).length;
+  const pct = Math.round(doneCount/TOTAL*100);
+  document.getElementById('s-done').textContent = doneCount;
+  document.getElementById('s-left').textContent = TOTAL - doneCount;
+  document.getElementById('s-pct').textContent = pct + '%';
+  document.getElementById('overall-bar').style.width = pct + '%';
+  document.getElementById('overall-pct').textContent = pct + '%';
+}
+
+function renderCalendar() {
+  const today = new Date();
+  if (calViewYear === undefined) { calViewYear = today.getFullYear(); calViewMonth = today.getMonth(); }
+  document.getElementById('cal-label').textContent = `${MONTH_NAMES[calViewMonth].slice(0,3)} ${calViewYear}`;
+
+  const activity = loadActivity();
+  const todayS = today.toISOString().slice(0,10);
+  const grid = document.getElementById('cal-grid');
+  const pill = document.getElementById('streak-pill');
+  grid.innerHTML = '';
+
+  DAY_LABELS.forEach(d => {
+    const h = document.createElement('div'); h.className='cal-dh'; h.textContent=d; grid.appendChild(h);
+  });
+
+  const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+
+  for(let i=0; i<firstDay; i++){
+    const e=document.createElement('div'); e.className='cal-cell empty'; grid.appendChild(e);
+  }
+  for(let day=1; day<=daysInMonth; day++){
+    const ds = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday = ds === todayS;
+    const isStudied = activity.includes(ds);
+    const isFuture = ds > todayS;
+    let cls = 'cal-cell';
+    if (isFuture) cls += ' future';
+    else if (isStudied) cls += ' studied';
+    else cls += ' missed';
+    if (isToday) cls += ' today';
+    const cell = document.createElement('div');
+    cell.className = cls;
+    cell.innerHTML = `<span>${day}</span>`;
+    cell.title = ds;
+    if (!isFuture) cell.addEventListener('click', () => toggleActivityDate(ds));
+    grid.appendChild(cell);
+  }
+
+  // Compute number of week rows this month needs
+  const numWeekRows = Math.ceil((firstDay + daysInMonth) / 7);
+
+  // Build ONE explicit row-height template and apply it to BOTH grids.
+  // This guarantees pixel-identical alignment — no relying on two separate
+  // grids independently computing the same implicit row sizes.
+  const rowTemplate = ['24px', ...Array(numWeekRows).fill('38px')].join(' ');
+  grid.style.gridTemplateRows = rowTemplate;
+  pill.style.gridTemplateRows = rowTemplate;
+
+  renderStreakPill(firstDay, daysInMonth, activity, todayS);
+}
+
+function renderStreakPill(firstDay, daysInMonth, activity, todayS) {
+  const pill = document.getElementById('streak-pill');
+  pill.innerHTML = '';
+
+  // Header spacer — sits opposite the S M T W T F S row
+  const spacer = document.createElement('div');
+  spacer.className = 'pill-spacer';
+  pill.appendChild(spacer);
+
+  // Compute weeks for this month
+  const weeks = [];
+  let slot = firstDay;
+  for(let day=1; day<=daysInMonth;){
+    const colStart = slot % 7;
+    const daysInRow = 7 - colStart;
+    const wd = [];
+    for(let c=0; c<daysInRow && day<=daysInMonth; c++, day++) wd.push(day);
+    weeks.push(wd);
+    slot = 0;
+  }
+
+  // Count all active weeks BEFORE this month so numbers are cumulative
+  const weeksBeforeThisMonth = countWeeksStudiedBefore(calViewYear, calViewMonth, activity);
+  let streakCount = weeksBeforeThisMonth;
+
+  const today = new Date();
+  const isCurrentMonth = (today.getFullYear() === calViewYear && today.getMonth() === calViewMonth);
+  const todayDayNum = isCurrentMonth ? today.getDate() : -1;
+
+  weeks.forEach((weekDays) => {
+    const hasStudied = weekDays.some(d => {
+      const ds = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      return activity.includes(ds);
+    });
+    const isCurrentWeek = isCurrentMonth && weekDays.includes(todayDayNum);
+    if (hasStudied) streakCount++;
+
+    const row = document.createElement('div');
+    row.className = 'pill-week';
+
+    if (isCurrentWeek && hasStudied) {
+      // Rounded emoji-style flame badge for the current week
+      const badge = document.createElement('div');
+      badge.className = 's-current';
+      badge.innerHTML = `
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="curFlame" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#e63946"/>
+              <stop offset="50%" stop-color="#ff8c2a"/>
+              <stop offset="100%" stop-color="#ffd23f"/>
+            </linearGradient>
+          </defs>
+          <path d="M16 29 C10 29 6.5 25.3 6.5 20.8 C6.5 16.8 9.2 14 10.7 11.2 C11.3 13.2 12.6 14.5 14 13.8 C12.6 9.4 14.5 4 17.8 1 C17.1 5.5 19.8 7.5 21.8 10.6 C23.1 12.5 23.7 14.4 23.7 16.3 C25.1 15 25.7 13 25.7 11 C27.6 13.7 27.6 17 27.6 19.3 C27.6 25 22.6 29 16 29 Z" fill="url(#curFlame)"/>
+        </svg>
+        <span class="cur-num">${streakCount}</span>`;
+      row.appendChild(badge);
+    } else {
+      const dot = document.createElement('div');
+      dot.className = `s-dot${hasStudied ? ' active' : ''}`;
+      dot.textContent = hasStudied ? streakCount : '';
+      row.appendChild(dot);
+    }
+    pill.appendChild(row);
+  });
+}
+
+// Count how many weeks had at least one study day in all months before (year, month)
+function countWeeksStudiedBefore(year, month, activity) {
+  if (!activity.length) return 0;
+  let count = 0;
+  // Go through every month from the earliest activity up to (but not including) current view month
+  const earliest = activity.slice().sort()[0]; // "YYYY-MM-DD"
+  const startYear = parseInt(earliest.slice(0,4));
+  const startMonth = parseInt(earliest.slice(5,7)) - 1;
+
+  for(let y = startYear; y <= year; y++) {
+    const mStart = (y === startYear) ? startMonth : 0;
+    const mEnd   = (y === year)      ? month - 1  : 11;
+    for(let m = mStart; m <= mEnd; m++) {
+      const fd = new Date(y, m, 1).getDay();
+      const dim = new Date(y, m+1, 0).getDate();
+      // compute weeks
+      let slot2 = fd;
+      for(let day=1; day<=dim;){
+        const colStart = slot2 % 7;
+        const daysInRow = 7 - colStart;
+        const wd = [];
+        for(let c=0; c<daysInRow && day<=dim; c++, day++) wd.push(day);
+        const hasStudied = wd.some(d => {
+          const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          return activity.includes(ds);
+        });
+        if (hasStudied) count++;
+        slot2 = 0;
+      }
+    }
+  }
+  return count;
+}
+
+function toggleActivityDate(ds) {
+  const act = loadActivity();
+  const idx = act.indexOf(ds);
+  if (idx === -1) act.push(ds); else act.splice(idx, 1);
+  saveActivity(act);
+  renderCalendar();
+}
+
+function changeMonth(dir) {
+  calViewMonth += dir;
+  if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+  if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+  renderCalendar();
+}
+
+// ── CONFETTI ──
+const confettiCanvas = document.getElementById('confetti-canvas');
+const ctx = confettiCanvas.getContext('2d');
+let confettiParticles = [];
+let confettiAnimId = null;
+
+function resizeCanvas() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function launchConfetti() {
+  resizeCanvas();
+  const colors = ['#d4845e','#ffd23f','#ff8c2a','#8ecfa0','#6a9e7a','#f0a882','#fff','#e63946'];
+  for (let i = 0; i < 120; i++) {
+    confettiParticles.push({
+      x: Math.random() * confettiCanvas.width,
+      y: -10 - Math.random() * 40,
+      r: 4 + Math.random() * 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 4,
+      vy: 3 + Math.random() * 4,
+      angle: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.2,
+      shape: Math.random() > 0.5 ? 'rect' : 'circle',
+      alpha: 1,
+    });
+  }
+  if (!confettiAnimId) animateConfetti();
+}
+
+function animateConfetti() {
+  ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  confettiParticles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    if (p.shape === 'rect') {
+      ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, p.r / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.08;
+    p.angle += p.spin;
+    if (p.y > confettiCanvas.height * 0.6) p.alpha -= 0.03;
+  });
+  confettiParticles = confettiParticles.filter(p => p.alpha > 0);
+  if (confettiParticles.length > 0) {
+    confettiAnimId = requestAnimationFrame(animateConfetti);
+  } else {
+    confettiAnimId = null;
+    ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  }
+}
+
+// ── ESTIMATED COMPLETION ──
+function renderEstimatedCompletion() {
+  const doneCount = Object.values(state).filter(Boolean).length;
+  const remaining = TOTAL - doneCount;
+  const estDateEl = document.getElementById('est-date');
+  const estSubEl  = document.getElementById('est-sub');
+
+  if (doneCount === 0) {
+    estDateEl.textContent = '—';
+    estSubEl.textContent  = 'Complete some lessons to get a projection';
+    return;
+  }
+
+  if (doneCount >= TOTAL) {
+    estDateEl.textContent = '🎉 Complete!';
+    estSubEl.textContent  = 'You have finished all 36 lessons!';
+    return;
+  }
+
+  // Calculate pace: lessons per day based on activity days
+  const activity = loadActivity();
+  const startD   = new Date(START_DATE);
+  const today    = new Date();
+  const daysSinceStart = Math.max(1, Math.round((today - startD) / 86400000));
+  const studiedDays    = activity.length;
+  const lessonsPerStudyDay = doneCount / Math.max(1, studiedDays);
+  // Only count days where they actually studied
+  const studyFrequency = studiedDays / Math.max(1, daysSinceStart); // fraction of days studied
+  // projected days from today until done
+  const daysRemaining = Math.ceil(remaining / (lessonsPerStudyDay * studyFrequency));
+
+  const estDate = new Date();
+  estDate.setDate(estDate.getDate() + daysRemaining);
+  const formatted = estDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  const weeksRemaining = Math.round(daysRemaining / 7);
+
+  estDateEl.textContent = formatted;
+  estSubEl.textContent  = `~${weeksRemaining} week${weeksRemaining !== 1 ? 's' : ''} away · ${remaining} lessons left · ${Math.round(lessonsPerStudyDay * 10) / 10} lessons/study day`;
+}
+
+function toggleLesson(mi, li) {
+  const key = `${mi}-${li}`;
+  const wasDone = state[key];
+  state[key] = !state[key];
+  saveState(state);
+  markTodayActive();
+
+  // Check if this tick just completed a module
+  if (!wasDone) {
+    const mod = MODULES[mi];
+    const allDone = mod.lessons.every((_, idx) => state[`${mi}-${idx}`]);
+    if (allDone) launchConfetti();
+  }
+
+  if (calOpen) renderCalendar();
+  renderModules();
+  renderSummary();
+  renderEstimatedCompletion();
+}
+function toggleModule(mi) { openModules[mi] = !openModules[mi]; renderModules(); }
+
+function renderModules() {
+  const container = document.getElementById('modules');
+  container.innerHTML = '';
+  MODULES.forEach((mod, mi) => {
+    const total = mod.lessons.length;
+    const done = mod.lessons.filter((_, li) => state[`${mi}-${li}`]).length;
+    const modPct = Math.round(done/total*100);
+    const isOpen = openModules[mi];
+    const status = done === total ? 'done' : done > 0 ? 'progress' : 'todo';
+    const pillLabel = status === 'done' ? 'done' : `${done}/${total}`;
+    const el = document.createElement('div');
+    el.className = 'module';
+    el.innerHTML = `
+      <div class="module-header" onclick="toggleModule(${mi})">
+        <div class="module-left">
+          <div class="module-num${status==='done'?' done-num':''}">${mi+1}</div>
+          <div>
+            <div class="module-title">${mod.title}</div>
+            <div class="module-meta">${mod.meta}</div>
+          </div>
+        </div>
+        <div class="module-right">
+          <div class="mod-bar-wrap"><div class="mod-bar-fill" style="width:${modPct}%"></div></div>
+          <span class="pill pill-${status}">${pillLabel}</span>
+          <span class="chevron${isOpen?' open':''}">▾</span>
+        </div>
+      </div>
+      <div class="lessons${isOpen?' open':''}">
+        ${mod.lessons.map((l,li)=>{
+          const d = state[`${mi}-${li}`];
+          return `<div class="lesson" onclick="toggleLesson(${mi},${li})">
+            <div class="check${d?' done':''}"></div>
+            <span class="lesson-name${d?' done':''}">${l.name}</span>
+            <span class="lesson-time">${l.time}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(el);
+  });
+}
+
+document.getElementById('start-date-label').textContent = `Started ${formatDate(START_DATE)}`;
+applyTheme(loadTheme());
+markTodayActive();
+renderSummary();
+renderEstimatedCompletion();
+renderModules();
+</script>
+</body>
+</html>
